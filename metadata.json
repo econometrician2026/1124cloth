@@ -1,0 +1,8 @@
+{
+  "name": "VESTIA — Virtual Fitting Room",
+  "description": "Interactive editorial virtual try-on boutique for styling garments and handbags with zone-based reveal transitions and deterministic showcase playback.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

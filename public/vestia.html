@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VESTIA — Virtual Fitting Room</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+      background: #ECE9E2; color: #181715;
+      font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .viewport {
+      width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden;
+    }
+    .canvas {
+      width: 1920px; height: 1080px; display: flex; position: relative; overflow: hidden;
+      background: #F6F4EF; box-shadow: 0 24px 80px rgba(24,23,21,0.14);
+      transform-origin: center center; flex-shrink: 0; user-select: none;
+    }
+    .demo-mode, .demo-mode *, .demo-mode *::before, .demo-mode *::after {
+      transition: none !important; animation: none !important;
+    }
+    .serif { font-family: "Cormorant Garamond", Georgia, serif; }
+    .tabular { font-variant-numeric: lining-nums tabular-nums; }
+    /* Left column */
+    .col-left {
+      width: 640px; height: 100%; background: #F6F4EF; border-right: 1px solid rgba(24,23,21,0.1);
+      padding: 28px 34px 24px; display: flex; flex-direction: column; flex-shrink: 0;
+    }
+    .brand-row { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 16px; }
+    .brand-title { font-size: 42px; line-height: 1; font-weight: 500; letter-spacing: 0.18em; margin: 0; }
+    .brand-sub { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #8B857C; margin-left: 12px; }
+    .search-wrap { position: relative; margin-bottom: 14px; }
+    .search-input {
+      width: 100%; height: 38px; background: #fff; border: 1px solid rgba(24,23,21,0.12);
+      padding: 0 34px 0 36px; font-size: 13px; color: #181715; outline: none; font-family: inherit;
+    }
+    .search-input:focus { border-color: rgba(24,23,21,0.45); }
+    .tabs { display: flex; gap: 24px; border-bottom: 1px solid rgba(24,23,21,0.1); margin-bottom: 16px; }
+    .tab-btn {
+      background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px;
+      padding: 0 0 10px; font-size: 13px; font-weight: 500; color: #7A746B; cursor: pointer; font-family: inherit;
+    }
+    .tab-btn.active { border-bottom-color: #181715; color: #181715; }
+    .catalog-sections { flex: 1; display: flex; flex-direction: column; justify-content: space-between; gap: 16px; overflow-y: auto; }
+    .sec-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+    .sec-title { font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #4B4741; margin: 0; }
+    .sec-meta { font-size: 11px; color: #8B857C; }
+    .card-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .prod-card {
+      position: relative; display: flex; flex-direction: column; text-align: left;
+      background: #fff; border: 1px solid rgba(24,23,21,0.1); padding: 0; cursor: pointer; font-family: inherit;
+    }
+    .prod-card.wearing { border-color: #181715; box-shadow: inset 0 0 0 1px #181715, 0 0 0 1px #181715; }
+    .wearing-tag {
+      position: absolute; top: 8px; left: 8px; z-index: 5; background: #181715; color: #F6F4EF;
+      font-size: 9px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; padding: 3px 8px; line-height: 1;
+    }
+    .prod-thumb { width: 100%; height: 156px; background: #fff; display: flex; align-items: center; justify-content: center; padding: 10px; overflow: hidden; }
+    .prod-thumb img { width: 100%; height: 100%; object-fit: contain; filter: brightness(1.03) contrast(1.04); }
+    .prod-info { padding: 8px 10px 10px; border-top: 1px solid rgba(24,23,21,0.06); background: #FDFCFA; }
+    .prod-brand { font-size: 10px; font-weight: 500; letter-spacing: 0.11em; text-transform: uppercase; color: #8B857C; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .prod-name { font-size: 12.5px; font-weight: 600; color: #181715; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .prod-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; font-size: 12px; }
+    /* Center stage */
+    .col-stage {
+      width: 740px; height: 100%; background: #fff; position: relative;
+      display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0;
+    }
+    .trying-banner {
+      position: absolute; top: 28px; left: 50%; transform: translateX(-50%); z-index: 30;
+      display: flex; align-items: center; gap: 10px; padding: 8px 20px;
+      background: rgba(255,255,255,0.96); border: 1px solid rgba(24,23,21,0.1); font-size: 13px;
+    }
+    .worn-strip {
+      position: absolute; left: 26px; top: 50%; transform: translateY(-50%); z-index: 30;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .worn-thumb {
+      width: 68px; background: #FAF9F6; border: 1px solid rgba(24,23,21,0.12); padding: 6px;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    .worn-thumb img { width: 54px; height: 54px; object-fit: contain; background: #fff; padding: 4px; filter: brightness(1.03) contrast(1.04); }
+    .worn-thumb span { margin-top: 4px; font-size: 9px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: #6D675F; }
+    .model-box { width: 548px; height: 982px; position: relative; }
+    .floor-shadow {
+      position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%);
+      width: 265px; height: 28px; border-radius: 50%; z-index: 20; pointer-events: none;
+      background: radial-gradient(ellipse at center, rgba(24,23,21,0.16) 0%, rgba(24,23,21,0.07) 44%, rgba(24,23,21,0) 74%);
+    }
+    .model-layers {
+      position: relative; width: 100%; height: 100%; overflow: hidden; background: #fff;
+      -webkit-mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%), linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%);
+      -webkit-mask-composite: source-in;
+      mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%), linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%);
+      mask-composite: intersect;
+    }
+    /* Strictly NO mix-blend-mode on model images */
+    .model-layer {
+      position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain;
+      pointer-events: none; filter: brightness(1.045) contrast(1.05);
+    }
+    .wipe-line {
+      position: absolute; z-index: 10; height: 2px; pointer-events: none; transform: translateY(-50%);
+      background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.95) 14%, #fff 50%, rgba(255,255,255,0.95) 86%, rgba(255,255,255,0) 100%);
+      box-shadow: 0 0 10px 2px rgba(255,255,255,0.95), 0 0 22px 5px rgba(255,255,255,0.65);
+      display: none;
+    }
+    .notice-bar {
+      position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); z-index: 40;
+      width: 560px; background: #181715; color: #F6F4EF; padding: 14px 20px;
+      display: none; align-items: center; justify-content: space-between; gap: 16px; font-size: 12.5px;
+    }
+    .notice-bar.show { display: flex; }
+    /* Right panel */
+    .col-right {
+      width: 540px; height: 100%; background: #F6F4EF; border-left: 1px solid rgba(24,23,21,0.1);
+      padding: 28px 36px 24px; display: flex; flex-direction: column; justify-content: space-between; flex-shrink: 0;
+    }
+    .look-box { background: #fff; border: 1px solid rgba(24,23,21,0.1); }
+    .look-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid rgba(24,23,21,0.08); }
+    .look-row:last-child { border-bottom: none; background: #FAF9F6; padding: 12px 16px; }
+    .bar-track { width: 100%; height: 4px; background: #E3DED5; }
+    .bar-fill { height: 100%; background: #181715; }
+    .shop-btn {
+      width: 100%; height: 50px; background: #181715; color: #F6F4EF; border: none;
+      font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+      cursor: pointer; font-family: inherit;
+    }
+    .complete-card {
+      width: 100%; background: #fff; border: 1px solid rgba(24,23,21,0.1); padding: 10px;
+      display: flex; align-items: center; gap: 14px; text-align: left; cursor: pointer; font-family: inherit;
+    }
+    .complete-card.active { border-color: #181715; box-shadow: inset 0 0 0 1px #181715, 0 0 0 1px #181715; }
+    .drawer {
+      position: absolute; inset: 0; z-index: 50; display: none; justify-content: flex-end; background: rgba(24,23,21,0.08);
+    }
+    .drawer.open { display: flex; }
+    .drawer-panel {
+      width: 540px; height: 100%; background: #F6F4EF; border-left: 1px solid rgba(24,23,21,0.18);
+      padding: 32px 36px; display: flex; flex-direction: column; justify-content: space-between;
+      box-shadow: -24px 0 60px rgba(24,23,21,0.12);
+    }
+    .demo-overlay { position: absolute; inset: 0; z-index: 100; pointer-events: none; overflow: hidden; }
+  </style>
+</head>
+<body>
+  <div class="viewport" id="viewport">
+    <div class="canvas" id="canvas">
+      <aside class="col-left">
+        <div class="brand-row">
+          <div><span class="serif brand-title">VESTIA</span><span class="brand-sub">Virtual Atelier</span></div>
+        </div>
+        <div class="search-wrap">
+          <input id="searchInput" class="search-input" type="text" placeholder="Search silhouettes, fabrics, or designers" />
+        </div>
+        <div class="tabs" id="tabs">
+          <button class="tab-btn active" data-cat="all">All</button>
+          <button class="tab-btn" data-cat="top">Tops</button>
+          <button class="tab-btn" data-cat="skirt">Skirts</button>
+          <button class="tab-btn" data-cat="bag">Bags</button>
+        </div>
+        <div class="catalog-sections" id="catalogRoot"></div>
+      </aside>
+
+      <main class="col-stage">
+        <div class="trying-banner"><span style="color:#7A746B">Trying on</span><span style="color:#8B857C">·</span><strong id="tryingOnLabel">Atelier Linen Vest</strong></div>
+        <div class="worn-strip" id="wornStrip"></div>
+        <div class="model-box">
+          <div class="floor-shadow"></div>
+          <div class="model-layers" id="modelLayers">
+            <div class="wipe-line" id="wipeLine"></div>
+          </div>
+        </div>
+        <div class="notice-bar" id="noticeBar">
+          <span id="noticeText"></span>
+          <button id="noticeClose" style="background:none;border:none;color:#F6F4EF;cursor:pointer;font-size:16px">×</button>
+        </div>
+      </main>
+
+      <aside class="col-right">
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px">
+            <h2 class="serif" style="font-size:30px;margin:0;font-weight:500">Your Look</h2>
+            <span id="pieceCount" class="tabular" style="font-size:12px;color:#7A746B">2 pieces</span>
+          </div>
+          <div class="look-box" id="yourLookBox"></div>
+        </div>
+
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px">
+            <span class="sec-title">Style &amp; Fit</span>
+            <span class="sec-meta">Atelier Index</span>
+          </div>
+          <p id="styleNote" style="font-size:12.5px;color:#5C5852;margin:0 0 14px"></p>
+          <div id="styleBars" style="display:flex;flex-direction:column;gap:12px;margin-bottom:18px"></div>
+          <button class="shop-btn tabular" id="shopBtn" data-demo-target="shop-the-look">Shop the look · $600</button>
+        </div>
+
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px">
+            <span class="sec-title">Complete looks</span>
+            <span class="sec-meta">One-click styling</span>
+          </div>
+          <div id="completeLooksRoot" style="display:flex;flex-direction:column;gap:10px"></div>
+        </div>
+      </aside>
+
+      <div class="drawer" id="shopDrawer">
+        <div style="flex:1" id="drawerBackdrop"></div>
+        <div class="drawer-panel">
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:18px;border-bottom:1px solid rgba(24,23,21,0.1)">
+              <div>
+                <div style="font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#8B857C">VESTIA Atelier Bag</div>
+                <h2 class="serif" style="font-size:34px;margin:4px 0 0;font-weight:500">Shop the Look</h2>
+              </div>
+              <button id="closeDrawerBtn" style="padding:6px 10px;background:#fff;border:1px solid rgba(24,23,21,0.12);cursor:pointer">×</button>
+            </div>
+            <div id="drawerItems" style="margin-top:20px;display:flex;flex-direction:column;gap:12px"></div>
+          </div>
+          <div style="border-top:1px solid rgba(24,23,21,0.12);padding-top:18px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:16px">
+              <span style="font-size:12px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase">Estimated Total</span>
+              <span id="drawerTotal" class="serif tabular" style="font-size:30px;font-weight:600">$600</span>
+            </div>
+            <button class="shop-btn" id="drawerConfirmBtn">Add to Bag</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-overlay" id="demoOverlay"></div>
+    </div>
+  </div>
+
+  <script>
+    const ITEMS = [
+      { id: 'T01', category: 'top', name: 'Atelier Linen Vest', brand: 'MAISON SOLIS', price: 280, color: 'Warm Ivory', image: './img/T01.jpg' },
+      { id: 'T02', category: 'top', name: 'Silk Draped Blouse', brand: 'LUNE NOIRE', price: 340, color: 'Champagne Taupe', image: './img/T02.jpg' },
+      { id: 'T03', category: 'top', name: 'Cashmere Knit Cardigan', brand: 'KOVA STUDIO', price: 390, color: 'Deep Espresso', image: './img/T03.jpg' },
+      { id: 'S01', category: 'skirt', name: 'Pleated Midi Skirt', brand: 'AURELIA', price: 320, color: 'Camel Sand', image: './img/S01.jpg' },
+      { id: 'S02', category: 'skirt', name: 'Bias-Cut Satin Skirt', brand: 'NOCTURNE', price: 295, color: 'Midnight Black', image: './img/S02.jpg' },
+      { id: 'S03', category: 'skirt', name: 'Structured A-Line Skirt', brand: 'VERRE & CO', price: 360, color: 'Muted Sage', image: './img/S03.jpg' },
+      { id: 'B01', category: 'bag', name: 'Sculpted Saddle Tote', brand: 'MARAUX', price: 680, color: 'Cognac Tan', image: './img/B01.jpg' },
+      { id: 'B02', category: 'bag', name: 'Crescent Leather Pouch', brand: 'SOVEREIGN', price: 540, color: 'Obsidian', image: './img/B02.jpg' },
+      { id: 'B03', category: 'bag', name: 'Woven Ivory Clutch', brand: 'ATELIER NORD', price: 610, color: 'Chalk Cream', image: './img/B03.jpg' },
+    ];
+    const BY_ID = Object.fromEntries(ITEMS.map(i => [i.id, i]));
+    const AVAILABLE = new Set([
+      'T01_S01_00','T01_S02_00','T01_S03_00','T02_S01_00','T02_S02_00','T02_S03_00','T03_S01_00','T03_S02_00','T03_S03_00',
+      'T01_S01_B01','T01_S01_B02','T01_S01_B03','T02_S02_B01','T02_S02_B02','T02_S02_B03','T03_S03_B01','T03_S03_B02','T03_S03_B03'
+    ]);
+    const COMPLETE_LOOKS = [
+      { id: 'look-1', title: 'Atelier Dawn', subtitle: 'Tailored linen & pleated camel', topId: 'T01', skirtId: 'S01', bagId: 'B01' },
+      { id: 'look-2', title: 'Evening Fluidity', subtitle: 'Draped silk & midnight satin', topId: 'T02', skirtId: 'S02', bagId: 'B02' },
+      { id: 'look-3', title: 'Gallery Tailored', subtitle: 'Fine cashmere & architectural twill', topId: 'T03', skirtId: 'S03', bagId: 'B03' },
+    ];
+    const ZONES = {
+      top: { top: 19, bottom: 48, left: 26, right: 74 },
+      skirt: { top: 41, bottom: 82, left: 24, right: 76 },
+      bag: { top: 51, bottom: 75, left: 17, right: 48 },
+      full: { top: 15, bottom: 93, left: 17, right: 83 },
+    };
+    const DEMO_SCRIPT = [
+      { time: 2, target: 'S02', kind: 'item', itemId: 'S02' },
+      { time: 4, target: 'T02', kind: 'item', itemId: 'T02' },
+      { time: 6, target: 'B01', kind: 'item', itemId: 'B01' },
+      { time: 8, target: 'B02', kind: 'item', itemId: 'B02' },
+      { time: 10, target: 'look-3', kind: 'complete', lookId: 'look-3' },
+      { time: 12, target: 'B01', kind: 'item', itemId: 'B01' },
+      { time: 14, target: 'shop-the-look', kind: 'shop' },
+    ];
+
+    const state = {
+      topId: 'T01', skirtId: 'S01', bagId: null,
+      prevKey: 'T01_S01_00', activeKey: 'T01_S01_00',
+      zone: 'full', progress: 1, tryingOn: 'Atelier Linen Vest',
+      cat: 'all', q: '', drawer: false, demo: false
+    };
+
+    const ease = t => t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
+    const lookKey = (t, s, b) => `${t}_${s}_${b || '00'}`;
+
+    function scaleCanvas() {
+      const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+      document.getElementById('canvas').style.transform = `scale(${s})`;
+    }
+    window.addEventListener('resize', scaleCanvas);
+    scaleCanvas();
+
+    // Pre-stack all 18 model images inside stage
+    const layersEl = document.getElementById('modelLayers');
+    const wipeLineEl = document.getElementById('wipeLine');
+    const layerNodes = {};
+    AVAILABLE.forEach(k => {
+      const img = document.createElement('img');
+      img.src = `./img/${k}.jpg`;
+      img.className = 'model-layer';
+      img.style.opacity = k === state.activeKey ? '1' : '0';
+      img.style.zIndex = k === state.activeKey ? '2' : '0';
+      layersEl.insertBefore(img, wipeLineEl);
+      layerNodes[k] = img;
+    });
+
+    function applyReveal() {
+      const trans = state.prevKey !== state.activeKey && state.progress < 1;
+      const b = ZONES[state.zone];
+      let clip = 'inset(0% 0% 0% 0%)';
+      let showLine = false, lineTop = b.bottom, lineOp = 0;
+      if (trans) {
+        if (state.progress <= 0.86) {
+          const p = ease(state.progress / 0.86);
+          const cy = b.top + (b.bottom - b.top) * p;
+          clip = `inset(${b.top}% ${100 - b.right}% ${Math.max(0, 100 - cy)}% ${b.left}%)`;
+          showLine = true; lineTop = cy; lineOp = Math.min(1, state.progress / 0.08);
+        } else {
+          const sp = ease((state.progress - 0.86) / 0.14);
+          clip = `inset(${b.top*(1-sp)}% ${(100-b.right)*(1-sp)}% ${(100-b.bottom)*(1-sp)}% ${b.left*(1-sp)}%)`;
+          showLine = sp < 0.95; lineTop = b.bottom; lineOp = Math.max(0, 1 - sp*1.15);
+        }
+      }
+      AVAILABLE.forEach(k => {
+        const el = layerNodes[k];
+        if (k === state.activeKey) {
+          el.style.zIndex = '2'; el.style.opacity = '1'; el.style.clipPath = clip;
+        } else if (trans && k === state.prevKey) {
+          el.style.zIndex = '1'; el.style.opacity = '1'; el.style.clipPath = 'inset(0% 0% 0% 0%)';
+        } else {
+          el.style.zIndex = '0'; el.style.opacity = '0'; el.style.clipPath = '';
+        }
+      });
+      wipeLineEl.style.display = showLine ? 'block' : 'none';
+      wipeLineEl.style.top = `${lineTop}%`;
+      wipeLineEl.style.left = `${b.left}%`;
+      wipeLineEl.style.width = `${b.right - b.left}%`;
+      wipeLineEl.style.opacity = `${lineOp}`;
+    }
+
+    let rafId = null;
+    function startWipe(fromKey, zone) {
+      if (rafId) cancelAnimationFrame(rafId);
+      state.prevKey = fromKey; state.zone = zone; state.progress = 0;
+      const t0 = performance.now();
+      const step = now => {
+        state.progress = Math.min(1, (now - t0) / 850);
+        applyReveal();
+        if (state.progress < 1) rafId = requestAnimationFrame(step);
+      };
+      rafId = requestAnimationFrame(step);
+    }
+
+    function showNotice(msg) {
+      const bar = document.getElementById('noticeBar');
+      if (!msg) { bar.classList.remove('show'); return; }
+      document.getElementById('noticeText').textContent = msg;
+      bar.classList.add('show');
+    }
+
+    function renderUI() {
+      const worn = [BY_ID[state.topId], BY_ID[state.skirtId]].concat(state.bagId ? [BY_ID[state.bagId]] : []);
+      const total = worn.reduce((a, i) => a + i.price, 0);
+      document.getElementById('tryingOnLabel').textContent = state.tryingOn;
+      document.getElementById('wornStrip').innerHTML = worn.map(i => `<div class="worn-thumb"><img src="${i.image}" alt="${i.name}" /><span>${i.category}</span></div>`).join('');
+
+      // Catalog
+      const groups = [
+        { id: 'top', label: 'Tops' },
+        { id: 'skirt', label: 'Skirts' },
+        { id: 'bag', label: 'Bags' },
+      ];
+      const q = state.q.trim().toLowerCase();
+      document.getElementById('catalogRoot').innerHTML = groups
+        .filter(g => state.cat === 'all' || state.cat === g.id)
+        .map(g => {
+          const list = ITEMS.filter(i => i.category === g.id && (!q || i.name.toLowerCase().includes(q) || i.brand.toLowerCase().includes(q)));
+          if (!list.length) return '';
+          return `<div><div class="sec-head"><h3 class="sec-title">${g.label}</h3><span class="sec-meta tabular">0${list.length} pieces</span></div><div class="card-grid">${list.map(item => {
+            const w = item.id === state.topId || item.id === state.skirtId || item.id === state.bagId;
+            return `<button class="prod-card ${w ? 'wearing' : ''}" data-item="${item.id}" data-demo-target="${item.id}">${w ? '<span class="wearing-tag">WEARING</span>' : ''}<div class="prod-thumb"><img src="${item.image}" alt="${item.name}" /></div><div class="prod-info"><div class="prod-brand">${item.brand}</div><div class="prod-name">${item.name}</div><div class="prod-foot"><span class="tabular">$${item.price}</span><span style="font-size:10px;color:#948E85">${item.color}</span></div></div></button>`;
+          }).join('')}</div></div>`;
+        }).join('');
+
+      document.getElementById('pieceCount').textContent = `${worn.length} pieces`;
+      document.getElementById('yourLookBox').innerHTML = worn.map(i => `<div class="look-row"><div style="display:flex;align-items:center;gap:12px"><img src="${i.image}" style="width:40px;height:40px;object-fit:contain;border:1px solid rgba(24,23,21,0.08);padding:3px;background:#fff" /><div><div style="font-size:10px;letter-spacing:0.12em;color:#8B857C">${i.brand}</div><div style="font-size:13.5px;font-weight:600">${i.name}</div></div></div><span class="tabular" style="font-size:13.5px;font-weight:500">$${i.price}</span></div>`).join('')
+        + `<div class="look-row"><span style="font-size:12px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:#5C5852">Total</span><span class="serif tabular" style="font-size:28px;font-weight:600">$${total.toLocaleString()}</span></div>`;
+
+      const scores = [
+        ['Silhouette', state.bagId ? 97 : 95],
+        ['Color Harmony', state.bagId ? 98 : 94],
+        ['Versatility', state.bagId ? 94 : 92],
+      ];
+      document.getElementById('styleNote').textContent = 'Balanced editorial proportions across refined atelier fabrics.';
+      document.getElementById('styleBars').innerHTML = scores.map(([l, v]) => `<div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px"><span>${l}</span><span class="tabular">${v} / 100</span></div><div class="bar-track"><div class="bar-fill" style="width:${v}%"></div></div></div>`).join('');
+      document.getElementById('shopBtn').textContent = `Shop the look · $${total.toLocaleString()}`;
+
+      document.getElementById('completeLooksRoot').innerHTML = COMPLETE_LOOKS.map(l => {
+        const active = state.topId === l.topId && state.skirtId === l.skirtId && state.bagId === l.bagId;
+        const lt = BY_ID[l.topId].price + BY_ID[l.skirtId].price + BY_ID[l.bagId].price;
+        return `<button class="complete-card ${active ? 'active' : ''}" data-look="${l.id}" data-demo-target="${l.id}"><img src="./img/${lookKey(l.topId, l.skirtId, l.bagId)}.jpg" style="width:56px;height:82px;object-fit:cover;object-position:top;filter:brightness(1.04) contrast(1.05)" /><div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between;align-items:center"><span class="serif" style="font-size:21px;font-weight:500">${l.title}</span><span class="tabular" style="font-size:12.5px">$${lt.toLocaleString()}</span></div><div style="font-size:12px;color:#7A746B">${l.subtitle}</div></div></button>`;
+      }).join('');
+
+      const drawer = document.getElementById('shopDrawer');
+      drawer.classList.toggle('open', state.drawer);
+      document.getElementById('drawerItems').innerHTML = worn.map(i => `<div style="background:#fff;border:1px solid rgba(24,23,21,0.1);padding:14px;display:flex;gap:14px;align-items:center"><img src="${i.image}" style="width:64px;height:64px;object-fit:contain" /><div style="flex:1"><div style="font-size:10px;color:#8B857C">${i.brand}</div><div style="font-size:14.5px;font-weight:600">${i.name}</div></div><span class="tabular" style="font-weight:600">$${i.price}</span></div>`).join('');
+      document.getElementById('drawerTotal').textContent = `$${total.toLocaleString()}`;
+      applyReveal();
+    }
+
+    function selectItem(id, interactive = true) {
+      const item = BY_ID[id]; if (!item) return;
+      const before = state.activeKey;
+      if (item.category === 'top' || item.category === 'skirt') {
+        const nt = item.category === 'top' ? item.id : state.topId;
+        const ns = item.category === 'skirt' ? item.id : state.skirtId;
+        const nb = state.bagId && AVAILABLE.has(lookKey(nt, ns, state.bagId)) ? state.bagId : null;
+        state.topId = nt; state.skirtId = ns; state.bagId = nb;
+        state.activeKey = lookKey(nt, ns, nb); state.tryingOn = item.name;
+        if (interactive) { showNotice(null); startWipe(before, item.category); }
+      } else {
+        if (state.bagId === item.id) {
+          state.bagId = null; state.activeKey = lookKey(state.topId, state.skirtId, null);
+          if (interactive) startWipe(before, 'bag');
+        } else if (AVAILABLE.has(lookKey(state.topId, state.skirtId, item.id))) {
+          state.bagId = item.id; state.activeKey = lookKey(state.topId, state.skirtId, item.id); state.tryingOn = item.name;
+          if (interactive) { showNotice(null); startWipe(before, 'bag'); }
+        } else if (interactive) {
+          showNotice(`${item.name} preview is curated for our 3 signature looks. Choose a Complete look to preview bags.`);
+        }
+      }
+      if (interactive) renderUI();
+    }
+
+    document.getElementById('catalogRoot').addEventListener('click', e => {
+      const btn = e.target.closest('[data-item]');
+      if (btn && !state.demo) selectItem(btn.dataset.item, true);
+    });
+    document.getElementById('completeLooksRoot').addEventListener('click', e => {
+      const btn = e.target.closest('[data-look]');
+      if (!btn || state.demo) return;
+      const l = COMPLETE_LOOKS.find(x => x.id === btn.dataset.look);
+      if (!l) return;
+      const before = state.activeKey;
+      state.topId = l.topId; state.skirtId = l.skirtId; state.bagId = l.bagId;
+      state.activeKey = lookKey(l.topId, l.skirtId, l.bagId); state.tryingOn = l.title;
+      showNotice(null); startWipe(before, 'full'); renderUI();
+    });
+    document.getElementById('tabs').addEventListener('click', e => {
+      const btn = e.target.closest('[data-cat]');
+      if (!btn) return;
+      state.cat = btn.dataset.cat;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+      renderUI();
+    });
+    document.getElementById('searchInput').addEventListener('input', e => { state.q = e.target.value; renderUI(); });
+    document.getElementById('shopBtn').addEventListener('click', () => { state.drawer = true; renderUI(); });
+    document.getElementById('closeDrawerBtn').addEventListener('click', () => { state.drawer = false; renderUI(); });
+    document.getElementById('drawerBackdrop').addEventListener('click', () => { state.drawer = false; renderUI(); });
+    document.getElementById('noticeClose').addEventListener('click', () => showNotice(null));
+
+    // Deterministic demo mode (?demo=1&t=...)
+    window.__VESTIA_SET_DEMO_TIME__ = function(t) {
+      state.demo = true;
+      document.getElementById('viewport').classList.add('demo-mode');
+      state.topId = 'T01'; state.skirtId = 'S01'; state.bagId = null;
+      state.prevKey = 'T01_S01_00'; state.activeKey = 'T01_S01_00';
+      state.zone = 'full'; state.progress = 1; state.tryingOn = 'Atelier Linen Vest'; state.drawer = false;
+      for (const act of DEMO_SCRIPT) {
+        if (t < act.time) break;
+        if (act.kind === 'shop') { state.drawer = true; continue; }
+        const before = state.activeKey;
+        if (act.kind === 'item') { selectItem(act.itemId, false); state.zone = BY_ID[act.itemId].category; }
+        else {
+          const l = COMPLETE_LOOKS.find(x => x.id === act.lookId);
+          state.topId = l.topId; state.skirtId = l.skirtId; state.bagId = l.bagId;
+          state.activeKey = lookKey(l.topId, l.skirtId, l.bagId); state.tryingOn = l.title; state.zone = 'full';
+        }
+        state.prevKey = before; state.progress = Math.min(1, (t - act.time) / 0.85);
+      }
+      renderUI();
+    };
+
+    renderUI();
+    const params = new URLSearchParams(location.search);
+    if (params.get('demo') === '1') {
+      window.__VESTIA_SET_DEMO_TIME__(parseFloat(params.get('t') || '0') || 0);
+    }
+  </script>
+</body>
+</html>
